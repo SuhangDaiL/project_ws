@@ -9,6 +9,7 @@ args.DATA.PATH <- "D:/Applications/R/william stobart/ws_data"
 # update data or map in the folder?
 args.TEMP.DATA.UPDATE <- F
 args.TEMP.MAP.UPDATE <- F
+args.TEMP.DATASORT.UPDATE <- F
 
 # Traffic Area and PostCode: Area, Distriction,
 # Sector, City Names
@@ -18,7 +19,8 @@ args.POSTATEA.CITY <- read.csv(file.path(args.DATA.PATH,
     "sysdata", "postarea_and_city.csv"))
 
 # installed packages
-args.PKG <- c("tidyverse", "readxl", "feather", "leaflet")
+args.PKG <- c("tidyverse", "readxl", "feather", "leaflet", "shiny",
+              "dplyr", "ggplot2", "plotly", "igraph", "heatmaply")
 pkgStatus <- suppressWarnings(lapply(args.PKG, require, 
     quietly = T, character = T))
 if (!all(as.logical(pkgStatus))) {
@@ -58,7 +60,6 @@ if (args.TEMP.DATA.UPDATE) {
     source(file.path(args.DATA.PATH, "sysdata", "updateMap.R"))
 }
 load(file = file.path(args.DATA.PATH, "sysdata", "ukmaps.rds"))
-
 
 # Data Transformation -----------------------------------------------------
 
@@ -199,5 +200,68 @@ data.Traffic["Col_d"] <- as.numeric(data.Traffic$Col_Date -
     min(data.Traffic$Col_Date))/3600/24 + 1
 data.Traffic["Del_d"] <- as.numeric(data.Traffic$Del_Date - 
     min(data.Traffic$Del_Date))/3600/24 + 1
+
+# Map Names Sequence based on sequence --------------------------------
+if (args.TEMP.DATASORT.UPDATE){
+  mydata = data.Traffic[,c("Col_Area", "Del_Area")] %>%
+    setNames(c("V1", "V2"))
+  tempData.sortArea <- ws_genTable(mydata, "V1", "V2")
+  mydata = data.Traffic[,c("Col_Dist", "Del_Dist")] %>%
+    setNames(c("V1", "V2"))
+  tempData.sortDist <- ws_genTable(mydata,"V1", "V2")
+  mydata = data.Traffic[,c("Col_Sect", "Del_Sect")] %>%
+    setNames(c("V1", "V2"))
+  tempData.sortSect <- ws_genTable(mydata,"V1", "V2")
+  
+  # Sort by area!
+  tempData.sort <- data.frame(area = ws_sort(tempData.sortArea)) %>%
+    left_join(setNames(args.POSTAREA.TRAFFICAREA, c("a", "area", "trafficarea")), by = "area") %>%
+    arrange(trafficarea) %>%
+    setNames(c("Area", "X", "Traffic.Area"))
+  tempVar <- ws_sort(tempData.sortDist)
+  for (i in 1:length(tempData.sort$Area)){
+    tempVar0 <- tempVar[tempData.sort[i,1] == 
+                          tempFun.splitPostCode(tempVar)$area]
+    if (i == 1){
+      tempData.sort0 <- data.frame(Dist = ifelse(length(tempVar0) == 0,
+                                                 NA,
+                                                 tempVar0),
+                                   Area = tempData.sort[i,1],
+                                   Traffic.Area = tempData.sort[i,3],
+                                   stringsAsFactors = F)
+    }
+    tempData.sort0 <- tempData.sort0 %>%
+      rbind(data.frame(Dist = tempVar0,
+                       Area = tempData.sort[i,1],
+                       Traffic.Area = tempData.sort[i,3],
+                       stringsAsFactors = F))
+  }
+  tempVar <- sort(unique(c(as.character(tempData.sortSect$V1[tempData.sortSect$count != 0]),
+                           as.character(tempData.sortSect$V2[tempData.sortSect$count != 0]))))
+  for (i in 1:length(tempData.sort0$Dist)){
+    tempVar0 <- tempVar[tempData.sort0$Dist[i] == 
+                          tempFun.splitPostCode(tempVar)$dist]
+    if (i == 1){
+      tempData.sort1 <- data.frame(Sect = ifelse(length(tempVar0) == 0,
+                                                        NA,
+                                                        tempVar0),
+                                   Dist = tempData.sort0[i,1],
+                                   Area = tempData.sort0[i,2],
+                                   Traffic.Area = tempData.sort0[i,3],
+                                   stringsAsFactors = F)
+    }
+    tempData.sort1 <- tempData.sort1 %>%
+      rbind(data.frame(Sect = ifelse(length(tempVar0) == 0,
+                                     NA,
+                                     tempVar0),
+                       Dist = tempData.sort0[i,1],
+                       Area = tempData.sort0[i,2],
+                       Traffic.Area = tempData.sort0[i,3],
+                       stringsAsFactors = F))
+  }
+  args.DATASEQ <- tempData.sort1
+  save(args.DATASEQ, file = file.path(args.DATA.PATH, "sysdata", "datasequence.rds"))
+}
+args.DATASEQ <- load(file = file.path(args.DATA.PATH, "sysdata", "datasequence.rds"))
 
 remove(list = ls(pattern = "^temp"))
