@@ -2,12 +2,8 @@
 # 1 -----------------------------------------------------------------------
 
 xnames <- c("WA", "NN", "YO", "A05", "A06", "A07", "A13")
-ws_heatmap(ws_genHeatmapData(data.Traffic, xnames, args.DATASEQ), 
-           ticktext = tempSeq.sortV,
-           gridname = tempSeq.gridL)
-
-
-
+temp <- ws_genHeatmapData(data.Traffic, xnames, args.DATASEQ)
+ws_heatmap(temp$heatmap, temp$sortv, temp$gridname)
 
 
 # 

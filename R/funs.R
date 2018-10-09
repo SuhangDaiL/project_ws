@@ -187,15 +187,6 @@ ws_genHeatmapData <- function(data, xnames, seqData){
   mydata <- mydata %>% 
     mutate(V1 = factor(V1, levels = tempSeq.sortV, ordered = TRUE),
            V2 = factor(V2, levels = tempSeq.sortV, ordered = TRUE))
-  
-  
-  tempFun.q <- function(x){
-    x.q <- quantile(x, 0.95)
-    x[x-x.q > 0] <- (x[x-x.q > 0]-x.q)/ (max(x) - x.q) * 
-      sqrt(var(x[x-x.q <= 0]))*10 + x.q
-    return(x)
-  }
-  
   tempData.heatmapcount = ws_genTable(mydata, "V1", "V2") 
   tempData.heatmapsum = ws_genTable(mydata, "V1", "V2", value = "value", fun = sum) %>%
     setNames(c("V1", "V2", "sum"))
@@ -214,6 +205,92 @@ ws_genHeatmapData <- function(data, xnames, seqData){
     mutate(zcolor = sum)
   return(list(heatmap = tempData.heatmap[c("V1","V2","zcolor","info")],
               sortv = tempSeq.sortV,
-              gridname = tempSeq.gridL))
+              gridname = tempSeq.gridL,
+              md = mydata[c("V1","V2")]))
 }
 
+ws_q <- function(x){
+  x.q <- quantile(x, 0.95)
+  x[x-x.q > 0] <- (x[x-x.q > 0]-x.q)/ (max(x) - x.q) * 
+    sqrt(var(x[x-x.q <= 0]))*10 + x.q
+  return(x)
+}
+
+
+ws_workflow <- function(data){
+  if (ncol(data) == 4){
+    data <- mutate(data, value = 1)
+  } 
+  data <- data %>% setNames(c("T1", "T2", "V1", "V2", "value"))
+  time_interval <- as.character(sort(unique(data$T1)))
+  x <- list()
+  for (i in time_interval) {
+    x[[i]] <- data %>% dplyr::filter(T1 == i)
+  }
+  
+  # TO, TD, O, D, CT
+  y <- data.frame(O = -1, TO = -1, IM = -1, TD = -1, value = -1)
+  i <- time_interval[1]
+  xi <- x[[i]]
+  output.z <- list()
+  z <- data.frame(IM = rep("*", nrow(xi)), stringsAsFactors = FALSE) %>% 
+    mutate(TO = xi$T1, TD = xi$T2, O = xi$V1, D = xi$V2, value = xi$value)
+  for (kk in seq(1, nrow(z))) {
+    if (z$D[[kk]] == z$O[[kk]]) {
+      y <- y %>% rbind(z[kk, c("O", "TO", "IM", "TD", "value")])
+    }
+  }
+  z <- z %>% filter(D != O)
+  output.z[[i]] <- z
+  
+  for (j in time_interval[seq(2, length(time_interval))]) {
+    xj <- x[[j]]
+    pp <- xj %>% filter(T1 == T2 & V1 == V2) %>% 
+      mutate(O = V1, TO = T1, IM = "*", TD = T2, value = value)
+    y <- rbind(y, pp[, c("O", "TO", "IM", "TD", "value")])
+    xj <- xj %>% filter(T1 != T2 | V1 != V2)
+    
+    z <- z %>% filter(D != O)
+    z_next <- z %>% filter(TD <= j) %>% 
+      arrange(-TD, stringr::str_count(IM, "\\*"), TO - TD) %>% 
+      mutate(l = TRUE)  # name of ? dont contain *
+    for (jj in unique(xj$V1)) {
+      jj1 <- seq(1, length(z_next$D))[jj == z_next$D & z_next$l]
+      jj2 <- seq(1, length(xj$V1))[jj == xj$V1]
+      if (length(jj1) >= length(jj2) & length(jj2) > 0) {
+        z_next[jj1[1:length(jj2)], ] <- z_next[jj1[1:length(jj2)],] %>% 
+          mutate(D = xj$V2[jj2], 
+                 TD = xj$T2[jj2], 
+                 IM = stringr::str_c(IM, xj$T1[jj2], "@", TD, "@", xj$V1[jj2], "*"),
+                 value = value + xj$value[jj2],
+                 l = FALSE)
+        
+      }
+      if (length(jj1) < length(jj2)) {
+        if (length(jj1) > 0) {
+          z_next[jj1, ] <- z_next[jj1, ] %>% 
+            mutate(D = xj$V2[jj2[1:length(jj1)]], 
+                   TD = xj$T2[jj2[1:length(jj1)]], 
+                   IM = stringr::str_c(IM, xj$T1[jj2[1:length(jj1)]], 
+                                       "@", TD, "@", xj$V1[jj2[1:length(jj1)]], "*"), 
+                   value = value + xj$value[jj2[1:length(jj1)]],
+                   l = FALSE)
+        }
+        
+        z_next <- rbind(z_next, data.frame(IM = "*", 
+                                           TO = xj$T1[jj2[(length(jj1) + 1):length(jj2)]], 
+                                           TD = xj$T2[jj2[(length(jj1) + 1):length(jj2)]], 
+                                           O = xj$V1[jj2[(length(jj1) + 1):length(jj2)]], 
+                                           D = xj$V2[jj2[(length(jj1) +1):length(jj2)]], 
+                                           value = xj$value[jj2[(length(jj1) +1):length(jj2)]],
+                                           l = FALSE, 
+                                           stringsAsFactors = FALSE))
+      }
+    }
+    z <- z_next
+    output.z[[j]] <- z[,c("IM", "TO", "TD", "O", "D", "value")]
+    y <- y %>% rbind(filter(z, O == D)[, c("O", "TO", "IM", "TD", "value")])
+  }
+  return(list(on = output.z,
+              off = y))
+}
