@@ -203,15 +203,15 @@ data.Traffic["Del_d"] <- as.numeric(data.Traffic$Del_Date -
 
 # Map Names Sequence based on sequence --------------------------------
 if (args.TEMP.DATASORT.UPDATE){
-  mydata = data.Traffic[,c("Col_Area", "Del_Area")] %>%
+  tempData.x = data.Traffic[,c("Col_Area", "Del_Area")] %>%
     setNames(c("V1", "V2"))
-  tempData.sortArea <- ws_genTable(mydata, "V1", "V2")
-  mydata = data.Traffic[,c("Col_Dist", "Del_Dist")] %>%
+  tempData.sortArea <- ws_genTable(tempData.x, "V1", "V2")
+  tempData.x = data.Traffic[,c("Col_Dist", "Del_Dist")] %>%
     setNames(c("V1", "V2"))
-  tempData.sortDist <- ws_genTable(mydata,"V1", "V2")
-  mydata = data.Traffic[,c("Col_Sect", "Del_Sect")] %>%
+  tempData.sortDist <- ws_genTable(tempData.x,"V1", "V2")
+  tempData.x = data.Traffic[,c("Col_Sect", "Del_Sect")] %>%
     setNames(c("V1", "V2"))
-  tempData.sortSect <- ws_genTable(mydata,"V1", "V2")
+  tempData.sortSect <- ws_genTable(tempData.x,"V1", "V2")
   
   # Sort by area!
   tempData.sort <- data.frame(area = ws_sort(tempData.sortArea)) %>%
@@ -262,6 +262,6 @@ if (args.TEMP.DATASORT.UPDATE){
   args.DATASEQ <- tempData.sort1
   save(args.DATASEQ, file = file.path(args.DATA.PATH, "sysdata", "datasequence.rds"))
 }
-args.DATASEQ <- load(file = file.path(args.DATA.PATH, "sysdata", "datasequence.rds"))
+load(file = file.path(args.DATA.PATH, "sysdata", "datasequence.rds"))
 
 remove(list = ls(pattern = "^temp"))

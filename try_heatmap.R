@@ -1,102 +1,14 @@
-# Heat Map!
-# plotly? (legend is in another graph!)
-# 
 
-ws_heatmap <- function(data, names = c("V1", "V2", "zcolor", "string")){
-  
-  # ws heatmap generate a heatmap based on data with 4 columns
-  # the first column is for x and then y and then zcolor with string explained
-  # for interative
-  
-}
 # 1 -----------------------------------------------------------------------
 
-# We will sort our areas, 
-
-mydata = data.Traffic[,c("Col_Dist", "Del_Dist", "Col_d", 
-                "Del_d", "Revenue", "Cust Code" )] %>%
-  setNames(c("V1", "V2", "T1", "T2", "value", "category"))
-
-tempData.heatmap = ws_genTable(mydata, "V1", "V2") 
-tempData.heatmapsum = ws_genTable(mydata, "V1", "V2", value = "value", fun = sum) %>%
-  setNames(c("V1", "V2", "sum"))
-tempData.heatmapmean = ws_genTable(mydata, "V1", "V2", value = "value", fun = mean) %>%
-  setNames(c("V1", "V2", "mean"))
-tempData.heatmap = left_join(tempData.heatmap, tempData.heatmapsum) %>%
-  left_join(tempData.heatmapmean)
+xnames <- c("WA", "NN", "YO", "A05", "A06", "A07", "A13")
+ws_heatmap(ws_genHeatmapData(data.Traffic, xnames, args.DATASEQ), 
+           ticktext = tempSeq.sortV,
+           gridname = tempSeq.gridL)
 
 
-# Sort by area!
-sortArea <- data.frame(area = ws_sort(tempData.heatmap[,c(1,2,3)])) %>%
-  left_join(setNames(args.POSTAREA.TRAFFICAREA, c("a", "area", "trafficarea")), by = "area") %>%
-  arrange(trafficarea)
 
-tempData.heatmap <- setNames(tempData.heatmap, c("V1", "V2", "count", "sum", "mean"))  %>%
-  mutate( V1 = as.character(V1),
-          V2 = as.character(V2),
-          value = ifelse(count == 0, NA, count)) %>%
-  na.omit()
-tempData.heatmap$V1 = factor(tempData.heatmap$V1, levels = sortArea$area, ordered = T)
-tempData.heatmap$V2 = factor(tempData.heatmap$V2, levels = sortArea$area, ordered = T)
 
-Fun.q <- function(x){
-  x.q <- quantile(x, 0.95)
-  x[x-x.q > 0] <- (x[x-x.q > 0]-x.q)/ (max(x) - x.q) * 
-    sqrt(var(x[x-x.q <= 0]))*10 + x.q
-  return(x)
-}
-sorta <- sortArea$area
-sortt <- sortArea$trafficarea
-sortn <- length(sorta)
-sortgrid <- c(0)
-for (i in seq(1, sortn-1)){
-  if (sortt[i] != sortt[i+1]){
-    sortgrid <- c(sortgrid, i+1)
-  }
-}
-sortgrid <- c(sortgrid, sortn)
-sortN <- setNames(seq(1,sortn), sorta)
-tempData.heatmap <- tempData.heatmap %>%
-  mutate(info = paste("Col =", sorta[V1], "in", sortt[V1], 
-                      "\nDel =", sorta[V2], "in", sortt[V2],
-                      "\ncount =", count, 
-                      "\nsum =", round(sum),
-                      "\nmean =", round(mean))) %>%
-  mutate(zcolor = Fun.q(sum),
-         V1 = sortN[V1],
-         V2 = sortN[V2])
-
-l1 <- list( tickmode = "array",
-           tickvals = seq(1, sortn), 
-           ticktext = sorta,
-           tickfont = list(size = 8),
-           title = "COLL")
-l2 <- list( tickmode = "array",
-            tickvals = seq(1, sortn), 
-            ticktext = sorta,
-            tickfont = list(size = 8),
-            title = "DEL")
-p <- plot_ly(height = sqrt(nrow(tempData.heatmap))*20, 
-             width = sqrt(nrow(tempData.heatmap))*20,
-             showscale=FALSE, showlegend = FALSE
-            ) %>%
-  add_trace(data = tempData.heatmap, x = ~V1, y = ~V2, 
-        z = ~ zcolor, 
-        type = "heatmap",
-        text = ~ info,
-        hoverinfo = "text",
-        colors =  "YlOrRd") %>%
-  layout(xaxis = l1,
-         yaxis = l2)
-
-for (i in sortgrid){
-  p <- p %>% add_lines(data = NULL, x = c(i, i)-0.5, y = c(0,sortn)-0.5, color = I("black"), 
-                       size = I(1), linetype = I("dotted"))
-  p <- p %>% add_lines(data = NULL, x = c(0,sortn)-0.5, y = c(i, i)-0.5, color = I("black"), 
-                       size = I(1), linetype = I("dotted"))
-}
-
-p
 
 # 
 # tempData.heatmap = tempData.heatmap %>%
@@ -206,3 +118,33 @@ p
 # 
 # d <- data.Traffic
 # p <- combineTable(d, "Col_Area", "Del_Area")
+
+
+# # Condition: Count > 100
+# args.countlimit <-  1000
+# mydata <- data.Traffic[,c("Col_Traffic_Area", "Del_Traffic_Area")]
+# tempData.ta <- ws_genTable(mydata, "Col_Traffic_Area", "Del_Traffic_Area")
+# tempFun.unique <- function(y, l){
+#   y[,1] = as.character(y[,1])
+#   y[,2] = as.character(y[,2])
+#   x <- unique(y[,2])
+#   for (i in 1:length(x)){
+#     if (!l[i]){
+#       y[y[,2] == x[i], 1] = x[i] 
+#     }
+#   }
+#   unique(y[,1])
+# }
+# 
+# 
+# temp.y <- seqData[,c(3,4)]
+# temp.l <- unique(as.character(seqData[,4])) %in%
+#   unique(unlist(tempData.ta[tempData.ta$count > args.countlimit, c(1,2)]))
+# temp.v <- tempFun.unique(temp.y, temp.l)
+# 
+# 
+# 
+# 
+# # Heat Map!
+# # plotly? (legend is in another graph!)
+# # 
